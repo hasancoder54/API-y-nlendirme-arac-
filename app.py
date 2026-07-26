@@ -54,7 +54,7 @@ HTML_TEMPLATE = """
                     <span>SECURITY FIREWALL: ACTIVE</span>
                 </div>
                 <div class="text-xs bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 px-4 py-2 rounded-xl font-mono font-bold">
-                    v4.8.2-PROD
+                    v4.8.5-PROD
                 </div>
             </div>
         </div>
@@ -66,7 +66,7 @@ HTML_TEMPLATE = """
         <!-- Hero Section -->
         <div class="text-center mb-16">
             <div class="inline-flex items-center space-x-2 bg-blue-500/10 border border-blue-500/20 text-blue-400 px-4 py-1.5 rounded-full text-xs font-mono mb-6 shadow-sm">
-                <i class="fa-solid fa-shield-halved mr-1.5"></i> Destrüktif İşlem Koruması Devrede
+                <i class="fa-solid fa-shield-halved mr-1.5"></i> Destrüktif İşlem Koruması & Akıllı Fallback Devrede
             </div>
             <h1 class="text-4xl md:text-6xl font-black tracking-tight mb-6 bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
                 Yüksek Güvenlikli Discord Gateway Köprüsü
@@ -124,7 +124,7 @@ HTML_TEMPLATE = """
                 <div class="text-left font-mono text-xs text-slate-400 space-y-1.5 w-full md:w-auto bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
                     <p><span class="text-cyan-400">Endpoint:</span> POST /api/discord</p>
                     <p><span class="text-cyan-400">Protokol:</span> HTTPS / REST TLS 1.3</p>
-                    <p><span class="text-cyan-400">Güvenlik:</span> Strict Destructive Block Enabled</p>
+                    <p><span class="text-cyan-400">Güvenlık:</span> Strict Destructive Block Enabled</p>
                 </div>
                 <button onclick="triggerSparks(event)" class="electric-btn w-full md:w-auto bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold px-8 py-4 rounded-2xl shadow-xl shadow-cyan-500/20 cursor-pointer flex items-center justify-center space-x-3">
                     <i class="fa-solid fa-bolt text-lg"></i>
@@ -170,7 +170,6 @@ def home():
 @app.route("/api/discord", methods=["POST"])
 def discord_proxy():
     try:
-        # Gelen istek gövdesini güvenli bir şekilde ayrıştır
         data = request.json or {}
         token = data.get("token")
         action = data.get("action")
@@ -195,7 +194,6 @@ def discord_proxy():
             }), 401
 
         # 2. Güvenlik Duvarı: Yıkıcı (Destrüktif) İşlem Engeli
-        # Kullanıcının kanal silme gibi zararlı istekler atmasını kesin olarak engelliyoruz.
         dangerous_actions = ["delete_channel", "delete", "ban", "kick", "purge", "remove_guild", "nuke"]
         if action in dangerous_actions or (isinstance(action, str) and "delete" in action.lower()):
             return jsonify({
@@ -232,7 +230,7 @@ def discord_proxy():
                 return jsonify({
                     "error": "VOIDX_DISCORD_API_GUILDS_REJECTED",
                     "status_code": guilds_res.status_code,
-                    "description": "Discord API, sunucu listesi çekme isteğini reddetti. Token yetkileri yetersiz olabilir.",
+                    "description": "Discord API, sunucu listesi çekme isteğini reddetti. Token yetkileri yetersiz olabilir veya User Token kısıtlamasına takılmış olabilirsiniz.",
                     "diagnostic_trace": {
                         "discord_http_status": guilds_res.status_code,
                         "raw_discord_response": guilds_res.text,
@@ -240,7 +238,7 @@ def discord_proxy():
                     },
                     "resolution_steps": [
                         "Botunuzun sunuculara 'View Channels' yetkisiyle eklendiğinden emin olun.",
-                        "Kullandığınız token değerinin geçerliliğini doğrulayın."
+                        "Eğer otomatik listeleme 403 veriyorsa, herhangi bir kanaldan Kanal ID kopyalayıp manuel olarak kullanın."
                     ]
                 }), 400
             
@@ -262,7 +260,7 @@ def discord_proxy():
                         except Exception as parse_ex:
                             overview_result.append({"server_name": g_name, "channels": [{"id": "0", "name": f"Parse Hatası: {str(parse_ex)}"}]})
                     else:
-                        overview_result.append({"server_name": g_name, "channels": [{"id": "0", "name": f"Erişim Engellendi (Status: {ch_res.status_code})"}]})
+                        overview_result.append({"server_name": g_name, "channels": [{"id": "0", "name": "Erişim Engellendi (403 - Manuel ID Kullanın)"}]})
 
             # DM Kanalları Entegrasyonu
             dm_res = requests.get("https://discord.com/api/v10/users/@me/channels", headers=headers, timeout=8)
@@ -281,30 +279,56 @@ def discord_proxy():
                         "guilds_count": len(guilds) if isinstance(guilds, list) else 0,
                         "dm_status": dm_res.status_code
                     },
-                    "resolution_steps": ["Botunuzu en az bir Discord sunucusuna davet edin."]
+                    "resolution_steps": ["Botunuzu en az bir Discord sunucusuna davet edin veya manuel Kanal ID girin."]
                 }), 404
 
             return jsonify(overview_result)
 
-        # 4. İşlem Modülü: Fetch (Mesaj Okuma)
+        # 4. İşlem Modülü: Fetch (Mesaj Okuma - Akıllı Fallback Eklenmiş)
         elif action == "fetch":
-            if not channel_id:
+            target_channel_id = channel_id
+            
+            # Eğer kanal ID girilmemişse (boş/null ise) sistem otomatik olarak ilk erişilebilir DM veya sunucu kanalını bulur!
+            if not target_channel_id or not str(target_channel_id).strip():
+                # Önce DM kanallarına bak
+                dm_res = requests.get("https://discord.com/api/v10/users/@me/channels", headers=headers, timeout=8)
+                if dm_res.status_code == 200:
+                    dm_list = dm_res.json()
+                    if isinstance(dm_list, list) and dm_list:
+                        target_channel_id = dm_list[0].get("id")
+                
+                # DM'de yoksa sunuculardan bulmaya çalış
+                if not target_channel_id:
+                    guilds_res = requests.get("https://discord.com/api/v10/users/@me/guilds", headers=headers, timeout=8)
+                    if guilds_res.status_code == 200:
+                        for g in guilds_res.json():
+                            g_id = g.get("id")
+                            ch_res = requests.get(f"https://discord.com/api/v10/guilds/{g_id}/channels", headers=headers, timeout=5)
+                            if ch_res.status_code == 200:
+                                for c in ch_res.json():
+                                    if c.get("type") == 0:
+                                        target_channel_id = c.get("id")
+                                        break
+                            if target_channel_id:
+                                break
+
+            if not target_channel_id:
                 return jsonify({
                     "error": "VOIDX_MISSING_CHANNEL_ID",
                     "status_code": 400,
-                    "description": "Mesajları okuyabilmek için geçerli bir 'channel_id' parametresi zorunludur.",
+                    "description": "Otomatik kanal bulma başarısız oldu. Mesajları okuyabilmek için lütfen geçerli bir 'channel_id' parametresi girin.",
                     "diagnostic_trace": {"provided_channel_id": channel_id},
                     "resolution_steps": ["Uygulama içerisindeki Kanal ID kutucuğuna hedef kanalın kimliğini girin."]
                 }), 400
             
-            msg_res = requests.get(f"https://discord.com/api/v10/channels/{channel_id}/messages?limit=20", headers=headers, timeout=10)
+            msg_res = requests.get(f"https://discord.com/api/v10/channels/{target_channel_id}/messages?limit=20", headers=headers, timeout=10)
             if msg_res.status_code != 200:
                 return jsonify({
                     "error": "VOIDX_DISCORD_FETCH_FAILED",
                     "status_code": msg_res.status_code,
                     "description": "Discord API, belirtilen kanaldaki mesajları okuma isteğini geri çevirdi.",
                     "diagnostic_trace": {
-                        "target_channel": channel_id,
+                        "target_channel": target_channel_id,
                         "discord_status": msg_res.status_code,
                         "discord_error_details": msg_res.text
                     },
@@ -355,7 +379,6 @@ def discord_proxy():
         }), 400
 
     except Exception as err:
-        # Aşırı detaylı istisna (exception) raporlama bloğu
         exc_type, exc_value, exc_tb = sys.exc_info()
         tb_list = traceback.format_tb(exc_tb)
         detailed_traceback = "".join(tb_list)
