@@ -1,8 +1,52 @@
 import os
+import threading
+import asyncio
 from flask import Flask, render_template_string, request, jsonify
-import requests
+import discord
+from discord.ext import commands
 
 app = Flask(__name__)
+
+# Discord Bot Gateway (WebSocket) Yapılandırması
+intents = discord.Intents.default()
+intents.message_content = True
+intents.guilds = True
+
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+# Android uygulama için sunucu içi hızlı önbellek
+cache_data = {
+    "ready": False,
+    "guilds": []
+}
+
+@bot.event
+async def on_ready():
+    print(f"[VoidX Bot] Gateway Bağlantısı Başarılı: {bot.user}")
+    cache_data["ready"] = True
+    update_guilds_cache()
+
+def update_guilds_cache():
+    guilds_list = []
+    for guild in bot.guilds:
+        channels = [{"id": str(c.id), "name": c.name} for c in guild.text_channels]
+        guilds_list.append({
+            "server_name": guild.name,
+            "channels": channels
+        })
+    cache_data["guilds"] = guilds_list
+
+# Botu arka planda sürekli aktif tutacak thread
+def run_discord_bot():
+    token = os.environ.get("DISCORD_TOKEN")
+    if token:
+        try:
+            bot.run(token)
+        except Exception as e:
+            print(f"Bot başlatılamadı: {e}")
+
+# Arka plan thread'ini başlatıyoruz
+threading.Thread(target=run_discord_bot, daemon=True).start()
 
 # VoidX Studios - Elektrik Animasyonlu Ana Sayfa
 HTML_TEMPLATE = """
@@ -11,7 +55,7 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VoidX Studios | Discord Proxy & Dashboard</title>
+    <title>VoidX Studios | Render Bot Gateway</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -36,25 +80,25 @@ HTML_TEMPLATE = """
             </div>
             <div class="flex items-center space-x-2 text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-full">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Render Cloud Aktif</span>
+                <span>Render Bot Gateway Aktif</span>
             </div>
         </div>
     </header>
     <main class="max-w-4xl mx-auto px-6 py-12 flex-grow w-full text-center">
         <h1 class="text-4xl md:text-5xl font-black tracking-tight mb-4 bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-            VoidX Discord Render Proxy
+            VoidX Render Bot Bridge
         </h1>
         <p class="text-slate-400 text-lg max-w-2xl mx-auto mb-8">
-            Render altyapısıyla Cloudflare engeline takılmayan kesintisiz API köprüsü.
+            Arka planda 7/24 çalışan Discord Bot altyapısı ile engelsiz ve hatasız köprü.
         </p>
         <div class="bg-slate-900/40 border border-slate-800 rounded-3xl p-8 backdrop-blur-md inline-block">
             <button onclick="triggerSparks(event)" class="electric-btn relative bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold px-8 py-4 rounded-2xl shadow-xl shadow-blue-500/20 cursor-pointer">
-                <i class="fa-solid fa-bolt mr-2"></i> Sistemi Ateşle
+                <i class="fa-solid fa-bolt mr-2"></i> Gateway Durumunu Test Et
             </button>
         </div>
     </main>
     <footer class="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-500">
-        <p>VoidX Studios © 2026 — Render Cloud Architecture</p>
+        <p>VoidX Studios © 2026 — Gateway Bot Architecture</p>
     </footer>
     <script>
         function triggerSparks(e) {
@@ -81,85 +125,71 @@ HTML_TEMPLATE = """
 def home():
     return render_template_string(HTML_TEMPLATE)
 
-@app.route("/api/discord", methods=["GET", "POST"])
+@app.route("/api/discord", methods=["POST"])
 def discord_proxy():
-    if request.method == "GET":
-        return jsonify({"status": "active", "brand": "VoidX Studios", "endpoint": "/api/discord"})
+    if not cache_data["ready"]:
+        return jsonify({"error": "Bot henüz Discord Gateway'e bağlanıyor, lütfen 5 saniye sonra tekrar deneyin."}), 503
 
-    try:
-        data = request.json or {}
-        token = data.get("token")
-        action = data.get("action")
-        channel_id = data.get("channel_id")
-        content = data.get("content")
+    data = request.json or {}
+    action = data.get("action")
+    channel_id = data.get("channel_id")
+    content = data.get("content")
 
-        if not token:
-            return jsonify({"error": "Token alanı boş olamaz."}), 400
+    if action == "overview":
+        update_guilds_cache()
+        return jsonify(cache_data["guilds"])
 
-        auth_header = token if token.startswith("Bot ") or token.startswith("Bearer ") else f"Bot {token}"
-        headers = {
-            "Authorization": auth_header,
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-        }
+    elif action == "fetch":
+        if not channel_id:
+            return jsonify({"error": "Kanal ID gerekli."}), 400
+        try:
+            ch_id_int = int(channel_id)
+        except ValueError:
+            return jsonify({"error": "Geçersiz Kanal ID formatı."}), 400
 
-        if action == "overview":
-            overview_result = []
-            guilds_res = requests.get("https://discord.com/api/v10/users/@me/guilds", headers=headers)
-            if guilds_res.status_code == 200:
-                guilds = guilds_res.json()
-                if isinstance(guilds, list):
-                    for g in guilds:
-                        g_id = g.get("id")
-                        g_name = g.get("name")
-                        if not g_id:
-                            continue
-                        ch_res = requests.get(f"https://discord.com/api/v10/guilds/{g_id}/channels", headers=headers)
-                        if ch_res.status_code == 200:
-                            try:
-                                channels = ch_res.json()
-                                if isinstance(channels, list):
-                                    text_channels = [{"id": c.get("id"), "name": c.get("name")} for c in channels if c.get("type") == 0 and c.get("id")]
-                                    if text_channels:
-                                        overview_result.append({"server_name": g_name, "channels": text_channels})
-                            except:
-                                pass
+        future = asyncio.run_coroutine_threadsafe(fetch_messages_async(ch_id_int), bot.loop)
+        try:
+            messages = future.result(timeout=6)
+            return jsonify(messages)
+        except Exception as e:
+            return jsonify({"error": "Mesajlar alınamadı", "details": str(e)}), 400
 
-            dm_res = requests.get("https://discord.com/api/v10/users/@me/channels", headers=headers)
-            if dm_res.status_code == 200:
-                dm_channels = dm_res.json()
-                if isinstance(dm_channels, list) and dm_channels:
-                    dm_list = []
-                    for dm in dm_channels:
-                        recipients = dm.get("recipients", [])
-                        dm_name = recipients[0].get("username", "Özel Sohbet") if recipients else f"DM ({dm.get('id')})"
-                        dm_list.append({"id": dm.get("id"), "name": dm_name})
-                    overview_result.append({"server_name": "Özel Mesajlar (DM)", "channels": dm_list})
+    elif action == "send":
+        if not channel_id or not content:
+            return jsonify({"error": "Kanal ID ve mesaj içeriği gerekli."}), 400
+        try:
+            ch_id_int = int(channel_id)
+        except ValueError:
+            return jsonify({"error": "Geçersiz Kanal ID formatı."}), 400
 
-            if not overview_result:
-                return jsonify({"error": "Erişilebilen kanal bulunamadı."}), 400
+        future = asyncio.run_coroutine_threadsafe(send_message_async(ch_id_int, content), bot.loop)
+        try:
+            future.result(timeout=6)
+            return jsonify({"status": "success", "message": "Mesaj başarıyla gönderildi."})
+        except Exception as e:
+            return jsonify({"error": "Mesaj gönderilemedi", "details": str(e)}), 400
 
-            return jsonify(overview_result)
+    return jsonify({"error": "Geçersiz action."}), 400
 
-        elif action == "fetch":
-            if not channel_id:
-                return jsonify({"error": "Lütfen Kanal ID girin."}), 400
+async def fetch_messages_async(channel_id):
+    channel = bot.get_channel(channel_id)
+    if not channel:
+        channel = await bot.fetch_channel(channel_id)
+    
+    messages = []
+    async for msg in channel.history(limit=20):
+        messages.append({
+            "author": {"username": msg.author.name},
+            "content": msg.content
+        })
+    return messages
 
-            msg_res = requests.get(f"https://discord.com/api/v10/channels/{channel_id}/messages?limit=20", headers=headers)
-            if msg_res.status_code != 200:
-                return jsonify({"error": "Mesajlar çekilemedi.", "status_code": msg_res.status_code, "details": msg_res.text}), 400
-            return jsonify(msg_res.json())
-
-        elif action == "send":
-            if not channel_id or not content:
-                return jsonify({"error": "Kanal ID ve mesaj gereklidir."}), 400
-            res = requests.post(f"https://discord.com/api/v10/channels/{channel_id}/messages", headers=headers, json={"content": content})
-            return jsonify(res.json()), res.status_code
-
-        return jsonify({"error": "Geçersiz action."}), 400
-
-    except Exception as err:
-        return jsonify({"error": "Sunucu içi hata", "details": str(err)}), 500
+async def send_message_async(channel_id, content):
+    channel = bot.get_channel(channel_id)
+    if not channel:
+        channel = await bot.fetch_channel(channel_id)
+    await channel.send(content)
+    return True
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
