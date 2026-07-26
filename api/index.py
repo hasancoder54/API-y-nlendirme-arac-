@@ -105,13 +105,19 @@ def discord_proxy():
             return jsonify({"error": "Token alanı boş olamaz."}), 400
 
         auth_header = token if token.startswith("Bot ") or token.startswith("Bearer ") else f"Bot {token}"
+        
+        # Cloudflare / Discord WAF engellerini aşmak için gerçek Mobil Tarayıcı Header'ları
         headers = {
             "Authorization": auth_header,
             "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0"
+            "User-Agent": "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Origin": "https://discord.com",
+            "Referer": "https://discord.com/"
         }
 
-        # 1. Genel Bakış (Detaylı Hata Raporlama ile)
+        # 1. Genel Bakış
         if action == "overview":
             guilds_res = requests.get("https://discord.com/api/v10/users/@me/guilds", headers=headers)
             if guilds_res.status_code != 200:
@@ -126,8 +132,6 @@ def discord_proxy():
                 return jsonify({"error": "Geçersiz veri formatı", "data": guilds}), 500
 
             overview_result = []
-            debug_logs = []
-
             for g in guilds:
                 g_id = g.get("id")
                 g_name = g.get("name")
@@ -142,20 +146,11 @@ def discord_proxy():
                             text_channels = [{"id": c.get("id"), "name": c.get("name")} for c in channels if c.get("type") == 0 and c.get("id")]
                             if text_channels:
                                 overview_result.append({"server_name": g_name, "channels": text_channels})
-                    except Exception as e:
-                        debug_logs.append({"server": g_name, "error": str(e)})
-                else:
-                    debug_logs.append({
-                        "server": g_name,
-                        "status_code": ch_res.status_code,
-                        "response": ch_res.text
-                    })
+                    except:
+                        pass
 
             if not overview_result:
-                return jsonify({
-                    "error": "Hiçbir kanala erişilemedi. Detaylı Discord Hata Raporu:",
-                    "debug_logs": debug_logs
-                }), 400
+                return jsonify({"error": "Erişilebilen kanal bulunamadı. Lütfen mobil uygulamadan doğrudan Kanal ID girerek deneyin."}), 400
 
             return jsonify(overview_result)
 
@@ -163,7 +158,7 @@ def discord_proxy():
         elif action == "fetch":
             target_channel_id = channel_id
             if not target_channel_id:
-                return jsonify({"error": "Otomatik arama engellendi. Lütfen uygulamadaki 'Kanal ID' kutucuğuna doğrudan okunacak kanalın ID'sini yazın."}), 400
+                return jsonify({"error": "Lütfen uygulamadaki 'Kanal ID' kutucuğuna okunacak kanalın ID'sini yazın."}), 400
 
             msg_res = requests.get(f"https://discord.com/api/v10/channels/{target_channel_id}/messages?limit=20", headers=headers)
             if msg_res.status_code != 200:
