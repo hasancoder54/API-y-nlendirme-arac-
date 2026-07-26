@@ -19,8 +19,8 @@ HTML_TEMPLATE = """
         <span class="text-xs bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/30">Çalışıyor</span>
     </header>
     <main class="max-w-3xl mx-auto px-6 py-12 text-center flex-grow">
-        <h2 class="text-3xl font-extrabold mb-4">Discord Proxy Sunucusu Hazır</h2>
-        <p class="text-slate-400 mb-8">Özel domaininiz üzerinden VPN'siz Discord entegrasyonu aktif.</p>
+        <h2 class="text-3xl font-extrabold mb-4">Discord Proxy Sunucusu Aktif</h2>
+        <p class="text-slate-400 mb-8">Özel domain üzerinden VPN'siz Discord entegrasyonu çalışıyor.</p>
         <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl text-left font-mono text-sm">
             <p class="text-blue-400 mb-2">// Endpoint:</p>
             <p class="text-slate-200">POST /api/discord</p>
@@ -57,14 +57,26 @@ def discord_proxy():
             "User-Agent": "Mozilla/5.0"
         }
 
+        # 1. Genel Bakış (Tüm Sunucular ve Kanallar)
         if action == "overview":
             guilds_res = requests.get("https://discord.com/api/v10/users/@me/guilds", headers=headers)
             if guilds_res.status_code != 200:
-                return jsonify({"error": "Token geçersiz veya yetkisiz.", "details": guilds_res.text}), 400
+                return jsonify({
+                    "error": "Sunucular alınamadı!",
+                    "discord_status": guilds_res.status_code,
+                    "discord_response": guilds_res.text
+                }), 400
             
-            guilds = guilds_res.json()
+            try:
+                guilds = guilds_res.json()
+            except Exception as e:
+                return jsonify({"error": "Sunucu listesi JSON formatına çevrilemedi.", "details": str(e)}), 500
+
             if not isinstance(guilds, list):
-                return jsonify({"error": "Discord'dan geçersiz veri döndü."}), 500
+                return jsonify({"error": "Discord beklenmeyen bir veri döndü.", "response": guilds}), 500
+
+            if len(guilds) == 0:
+                return jsonify({"error": "Bu bot henüz hiçbir Discord sunucusuna eklenmemiş! Botu bir sunucuya davet edin."}), 400
 
             overview_result = []
             for g in guilds:
@@ -81,33 +93,58 @@ def discord_proxy():
                             overview_result.append({"server_name": g_name, "channels": text_channels})
                     except:
                         pass
+                else:
+                    overview_result.append({"server_name": g_name, "error": f"Kanallara erişilemedi (Status: {ch_res.status_code})" })
+
             return jsonify(overview_result)
 
+        # 2. Son Mesajları Otomatik Oku
         elif action == "fetch":
             target_channel_id = channel_id
             if not target_channel_id:
                 guilds_res = requests.get("https://discord.com/api/v10/users/@me/guilds", headers=headers)
                 if guilds_res.status_code != 200:
-                    return jsonify({"error": "Sunucular alınamadı."}), 400
+                    return jsonify({
+                        "error": "Sunucular alınamadı!",
+                        "discord_status": guilds_res.status_code,
+                        "discord_response": guilds_res.text
+                    }), 400
+                
                 guilds = guilds_res.json()
-                if not guilds:
-                    return jsonify({"error": "Sunucu bulunamadı."}), 400
+                if not isinstance(guilds, list) or len(guilds) == 0:
+                    return jsonify({"error": "Bot hiçbir sunucuda bulunmuyor. Önce botu bir sunucuya ekleyin."}), 400
                 
                 first_guild_id = guilds[0].get("id")
                 channels_res = requests.get(f"https://discord.com/api/v10/guilds/{first_guild_id}/channels", headers=headers)
                 if channels_res.status_code != 200:
-                    return jsonify({"error": "Kanallar alınamadı."}), 400
+                    return jsonify({
+                        "error": "Kanallar alınamadı!",
+                        "discord_status": channels_res.status_code,
+                        "discord_response": channels_res.text
+                    }), 400
+                
                 channels = channels_res.json()
+                if not isinstance(channels, list):
+                    return jsonify({"error": "Kanal listesi okunamadı.", "response": channels}), 400
+
                 for c in channels:
                     if c.get("type") == 0:
                         target_channel_id = c.get("id")
                         break
 
+                if not target_channel_id:
+                    return jsonify({"error": "İlk sunucuda uygun metin kanalı bulunamadı."}), 400
+
             msg_res = requests.get(f"https://discord.com/api/v10/channels/{target_channel_id}/messages?limit=20", headers=headers)
             if msg_res.status_code != 200:
-                return jsonify({"error": "Mesajlar çekilemedi.", "details": msg_res.text}), 400
+                return jsonify({
+                    "error": "Mesajlar çekilemedi!",
+                    "discord_status": msg_res.status_code,
+                    "discord_response": msg_res.text
+                }), 400
             return jsonify(msg_res.json())
 
+        # 3. Mesaj Gönder
         elif action == "send":
             if not channel_id or not content:
                 return jsonify({"error": "Kanal ID ve mesaj gereklidir."}), 400
@@ -117,4 +154,4 @@ def discord_proxy():
         return jsonify({"error": "Geçersiz action."}), 400
 
     except Exception as err:
-        return jsonify({"error": "Sunucu hatası", "details": str(err)}), 500
+        return jsonify({"error": "Sunucu içi kritik hata", "details": str(err)}), 500
