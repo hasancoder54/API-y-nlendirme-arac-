@@ -3,7 +3,7 @@ import requests
 
 app = Flask(__name__)
 
-# VoidX Studios - Elektrik Animasyonlu ve Şık Tasarımlı Ana Sayfa
+# VoidX Studios - Muazzam Elektrik Animasyonlu ve Şık Ana Sayfa
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="tr">
@@ -80,7 +80,7 @@ HTML_TEMPLATE = """
                 VoidX Discord Proxy Köprüsü
             </h1>
             <p class="text-slate-400 text-lg max-w-2xl mx-auto">
-                Engelleri aşan, mobil uygulamalar ve özel entegrasyonlar için tasarlanmış yüksek performanslı Vercel API altyapısı.
+                Engelleri aşan, mobil uygulamalar ve özel Discord entegrasyonları için tasarlanmış yüksek performanslı Vercel API altyapısı.
             </p>
         </div>
 
@@ -181,72 +181,73 @@ def discord_proxy():
             "User-Agent": "Mozilla/5.0"
         }
 
-        # 1. Genel Bakış (Tüm Sunucular ve Kanallar)
+        # 1. Genel Bakış (Sunucular + DM Kanalları)
         if action == "overview":
-            guilds_res = requests.get("https://discord.com/api/v10/users/@me/guilds", headers=headers)
-            if guilds_res.status_code != 200:
-                return jsonify({
-                    "error": "Sunucular alınamadı!",
-                    "discord_status": guilds_res.status_code,
-                    "discord_response": guilds_res.text
-                }), 400
-            
-            guilds = guilds_res.json()
-            if not isinstance(guilds, list):
-                return jsonify({"error": "Discord'dan geçersiz veri döndü."}), 500
-
             overview_result = []
-            for g in guilds:
-                g_id = g.get("id")
-                g_name = g.get("name")
-                if not g_id:
-                    continue
-                
-                ch_res = requests.get(f"https://discord.com/api/v10/guilds/{g_id}/channels", headers=headers)
-                if ch_res.status_code == 200:
-                    try:
-                        channels = ch_res.json()
-                        if isinstance(channels, list):
-                            text_channels = [{"id": c.get("id"), "name": c.get("name")} for c in channels if c.get("type") == 0 and c.get("id")]
-                            if text_channels:
-                                overview_result.append({"server_name": g_name, "channels": text_channels})
-                    except:
-                        pass
-                else:
-                    continue
+            
+            guilds_res = requests.get("https://discord.com/api/v10/users/@me/guilds", headers=headers)
+            if guilds_res.status_code == 200:
+                guilds = guilds_res.json()
+                if isinstance(guilds, list):
+                    for g in guilds:
+                        g_id = g.get("id")
+                        g_name = g.get("name")
+                        if not g_id:
+                            continue
+                        ch_res = requests.get(f"https://discord.com/api/v10/guilds/{g_id}/channels", headers=headers)
+                        if ch_res.status_code == 200:
+                            try:
+                                channels = ch_res.json()
+                                if isinstance(channels, list):
+                                    text_channels = [{"id": c.get("id"), "name": c.get("name")} for c in channels if c.get("type") == 0 and c.get("id")]
+                                    if text_channels:
+                                        overview_result.append({"server_name": g_name, "channels": text_channels})
+                            except:
+                                pass
+
+            dm_res = requests.get("https://discord.com/api/v10/users/@me/channels", headers=headers)
+            if dm_res.status_code == 200:
+                dm_channels = dm_res.json()
+                if isinstance(dm_channels, list) and dm_channels:
+                    dm_list = []
+                    for dm in dm_channels:
+                        recipients = dm.get("recipients", [])
+                        dm_name = recipients[0].get("username", "Özel Sohbet") if recipients else f"DM ({dm.get('id')})"
+                        dm_list.append({"id": dm.get("id"), "name": dm_name})
+                    overview_result.append({"server_name": "Özel Mesajlar (DM)", "channels": dm_list})
 
             if not overview_result:
-                return jsonify({"error": "Erişilebilen hiçbir kanal bulunamadı. Lütfen botun sunucuda yetkisi olduğundan emin olun."}), 400
+                return jsonify({
+                    "error": "Hiçbir kanala erişilemedi. Lütfen botun sunucularda 'View Channels' yetkisi olduğundan emin olun."
+                }), 400
 
             return jsonify(overview_result)
 
-        # 2. Son Mesajları Otomatik Oku
+        # 2. Mesajları Oku
         elif action == "fetch":
             target_channel_id = channel_id
             if not target_channel_id:
                 guilds_res = requests.get("https://discord.com/api/v10/users/@me/guilds", headers=headers)
-                if guilds_res.status_code != 200:
-                    return jsonify({"error": "Sunucular alınamadı.", "details": guilds_res.text}), 400
-                
-                guilds = guilds_res.json()
-                if not isinstance(guilds, list) or not guilds:
-                    return jsonify({"error": "Sunucu bulunamadı."}), 400
-
-                for g in guilds:
-                    g_id = g.get("id")
-                    ch_res = requests.get(f"https://discord.com/api/v10/guilds/{g_id}/channels", headers=headers)
-                    if ch_res.status_code == 200:
-                        channels = ch_res.json()
-                        if isinstance(channels, list):
-                            for c in channels:
+                if guilds_res.status_code == 200:
+                    for g in guilds_res.json():
+                        ch_res = requests.get(f"https://discord.com/api/v10/guilds/{g.get('id')}/channels", headers=headers)
+                        if ch_res.status_code == 200:
+                            for c in ch_res.json():
                                 if c.get("type") == 0:
                                     target_channel_id = c.get("id")
                                     break
-                    if target_channel_id:
-                        break
-
+                        if target_channel_id:
+                            break
+                
                 if not target_channel_id:
-                    return jsonify({"error": "Erişilebilir uygun metin kanalı bulunamadı."}), 400
+                    dm_res = requests.get("https://discord.com/api/v10/users/@me/channels", headers=headers)
+                    if dm_res.status_code == 200:
+                        dm_list = dm_res.json()
+                        if dm_list:
+                            target_channel_id = dm_list[0].get("id")
+
+            if not target_channel_id:
+                return jsonify({"error": "Uygun kanal bulunamadı. Lütfen manuel olarak Kanal ID girin."}), 400
 
             msg_res = requests.get(f"https://discord.com/api/v10/channels/{target_channel_id}/messages?limit=20", headers=headers)
             if msg_res.status_code != 200:
