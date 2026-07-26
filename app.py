@@ -54,7 +54,7 @@ HTML_TEMPLATE = """
                     <span>SECURITY FIREWALL: ACTIVE</span>
                 </div>
                 <div class="text-xs bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 px-4 py-2 rounded-xl font-mono font-bold">
-                    v4.8.5-PROD
+                    v4.8.7-PROD
                 </div>
             </div>
         </div>
@@ -66,7 +66,7 @@ HTML_TEMPLATE = """
         <!-- Hero Section -->
         <div class="text-center mb-16">
             <div class="inline-flex items-center space-x-2 bg-blue-500/10 border border-blue-500/20 text-blue-400 px-4 py-1.5 rounded-full text-xs font-mono mb-6 shadow-sm">
-                <i class="fa-solid fa-shield-halved mr-1.5"></i> Destrüktif İşlem Koruması & Akıllı Fallback Devrede
+                <i class="fa-solid fa-shield-halved mr-1.5"></i> Destrüktif İşlem Koruması & Resmi Bot Gateway Devrede
             </div>
             <h1 class="text-4xl md:text-6xl font-black tracking-tight mb-6 bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
                 Yüksek Güvenlikli Discord Gateway Köprüsü
@@ -91,7 +91,7 @@ HTML_TEMPLATE = """
                     <i class="fa-solid fa-bolt"></i>
                 </div>
                 <h3 class="font-bold text-white text-lg mb-2">Yüksek Hız (Proxy)</h3>
-                <p class="text-slate-400 text-sm leading-relaxed">Render bulut sunucuları üzerinden Cloudflare engellerini tamamen bypas eden optimize yönlendirme.</p>
+                <p class="text-slate-400 text-sm leading-relaxed">Render bulut sunucuları üzerinden resmi DiscordBot User-Agent protokolü ile sıfır hata.</p>
             </div>
 
             <div class="cyber-card bg-slate-900/50 border border-slate-800 rounded-3xl p-7 backdrop-blur-xl transition-all duration-300 hover:border-indigo-500/50">
@@ -124,7 +124,7 @@ HTML_TEMPLATE = """
                 <div class="text-left font-mono text-xs text-slate-400 space-y-1.5 w-full md:w-auto bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
                     <p><span class="text-cyan-400">Endpoint:</span> POST /api/discord</p>
                     <p><span class="text-cyan-400">Protokol:</span> HTTPS / REST TLS 1.3</p>
-                    <p><span class="text-cyan-400">Güvenlık:</span> Strict Destructive Block Enabled</p>
+                    <p><span class="text-cyan-400">Güvenlik:</span> Strict Destructive Block Enabled</p>
                 </div>
                 <button onclick="triggerSparks(event)" class="electric-btn w-full md:w-auto bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold px-8 py-4 rounded-2xl shadow-xl shadow-cyan-500/20 cursor-pointer flex items-center justify-center space-x-3">
                     <i class="fa-solid fa-bolt text-lg"></i>
@@ -215,10 +215,11 @@ def discord_proxy():
         auth_token = token.strip()
         auth_header = auth_token if auth_token.startswith("Bot ") or auth_token.startswith("Bearer ") else f"Bot {auth_token}"
         
+        # DİKKAT: Render aktif domain adresin User-Agent içerisine resmi olarak tanımlandı.
         headers = {
             "Authorization": auth_header,
             "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 VoidXGateway/4.8"
+            "User-Agent": "DiscordBot (https://discordapi-j6jg.onrender.com, 4.8.7)"
         }
 
         # 3. İşlem Modülü: Overview (Sunucular ve Kanallar)
@@ -238,7 +239,7 @@ def discord_proxy():
                     },
                     "resolution_steps": [
                         "Botunuzun sunuculara 'View Channels' yetkisiyle eklendiğinden emin olun.",
-                        "Eğer otomatik listeleme 403 veriyorsa, herhangi bir kanaldan Kanal ID kopyalayıp manuel olarak kullanın."
+                        "Eğer otomatik listeleme hata veriyorsa, herhangi bir kanaldan Kanal ID kopyalayıp manuel olarak kullanın."
                     ]
                 }), 400
             
@@ -284,20 +285,17 @@ def discord_proxy():
 
             return jsonify(overview_result)
 
-        # 4. İşlem Modülü: Fetch (Mesaj Okuma - Akıllı Fallback Eklenmiş)
+        # 4. İşlem Modülü: Fetch (Mesaj Okuma)
         elif action == "fetch":
             target_channel_id = channel_id
             
-            # Eğer kanal ID girilmemişse (boş/null ise) sistem otomatik olarak ilk erişilebilir DM veya sunucu kanalını bulur!
             if not target_channel_id or not str(target_channel_id).strip():
-                # Önce DM kanallarına bak
                 dm_res = requests.get("https://discord.com/api/v10/users/@me/channels", headers=headers, timeout=8)
                 if dm_res.status_code == 200:
                     dm_list = dm_res.json()
                     if isinstance(dm_list, list) and dm_list:
                         target_channel_id = dm_list[0].get("id")
                 
-                # DM'de yoksa sunuculardan bulmaya çalış
                 if not target_channel_id:
                     guilds_res = requests.get("https://discord.com/api/v10/users/@me/guilds", headers=headers, timeout=8)
                     if guilds_res.status_code == 200:
@@ -369,7 +367,6 @@ def discord_proxy():
 
             return jsonify(res.json()), res.status_code
 
-        # Tanımsız İşlem Hatası
         return jsonify({
             "error": "VOIDX_INVALID_ACTION_PARAMETER",
             "status_code": 400,
