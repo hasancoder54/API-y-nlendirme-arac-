@@ -3,30 +3,154 @@ import requests
 
 app = Flask(__name__)
 
+# VoidX Studios - Elektrik Animasyonlu ve Şık Tasarımlı Ana Sayfa
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuantumBridge API</title>
+    <title>VoidX Studios | Discord Proxy & Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @keyframes electricPulse {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        
+        .electric-btn {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .electric-btn:active {
+            transform: scale(0.95);
+        }
+
+        .spark {
+            position: absolute;
+            background: cyan;
+            pointer-events: none;
+            opacity: 0;
+            border-radius: 50%;
+            box-shadow: 0 0 10px cyan, 0 0 20px blue;
+        }
+
+        @keyframes sparkAnim {
+            0% {
+                transform: translate(var(--startX), var(--startY)) scale(0.5);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(0, 0) scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        .spark-active {
+            animation: sparkAnim 0.4s ease-out forwards;
+        }
+    </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between font-sans">
-    <header class="border-b border-slate-800 bg-slate-900/50 p-6 flex justify-between items-center">
-        <h1 class="font-bold text-lg text-blue-400"><i class="fa-solid fa-bolt-lightning mr-2"></i>QuantumBridge API Aktif</h1>
-        <span class="text-xs bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/30">Çalışıyor</span>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between font-sans selection:bg-blue-500 selection:text-white">
+
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400 shadow-lg shadow-blue-500/20">
+                    <i class="fa-solid fa-bolt-lightning text-lg"></i>
+                </div>
+                <span class="font-bold text-lg tracking-wide bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">VoidX Studios</span>
+            </div>
+            <div class="flex items-center space-x-2 text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-full">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Vercel Edge Aktif</span>
+            </div>
+        </div>
     </header>
-    <main class="max-w-3xl mx-auto px-6 py-12 text-center flex-grow">
-        <h2 class="text-3xl font-extrabold mb-4">Discord Proxy Sunucusu Aktif</h2>
-        <p class="text-slate-400 mb-8">Özel domain üzerinden VPN'siz Discord entegrasyonu çalışıyor.</p>
-        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl text-left font-mono text-sm">
-            <p class="text-blue-400 mb-2">// Endpoint:</p>
-            <p class="text-slate-200">POST /api/discord</p>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto px-6 py-12 flex-grow w-full">
+        <div class="text-center mb-12">
+            <h1 class="text-4xl md:text-5xl font-black tracking-tight mb-4 bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+                VoidX Discord Proxy Köprüsü
+            </h1>
+            <p class="text-slate-400 text-lg max-w-2xl mx-auto">
+                Engelleri aşan, mobil uygulamalar ve özel entegrasyonlar için tasarlanmış yüksek performanslı Vercel API altyapısı.
+            </p>
+        </div>
+
+        <!-- Endpoints Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+            <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md hover:border-blue-500/40 transition-all group">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-xs font-mono bg-blue-500/10 text-blue-400 px-3 py-1 rounded-lg border border-blue-500/20">POST /api/discord</span>
+                    <i class="fa-solid fa-comments text-slate-500 group-hover:text-blue-400 transition-colors"></i>
+                </div>
+                <h3 class="font-mono font-bold text-white text-lg mb-2">Discord Proxy Endpoint</h3>
+                <p class="text-slate-400 text-sm">Sunucuları, kanalları listeler ve güvenli mesaj köprüsü sağlar.</p>
+            </div>
+
+            <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md hover:border-emerald-500/40 transition-all group">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-xs font-mono bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-lg border border-emerald-500/20">GET</span>
+                    <i class="fa-solid fa-heart-pulse text-slate-500 group-hover:text-emerald-400 transition-colors"></i>
+                </div>
+                <h3 class="font-mono font-bold text-white text-lg mb-2">Sistem Durumu</h3>
+                <p class="text-slate-400 text-sm">VoidX API sağlık durumunu ve çalışma süresini denetler.</p>
+            </div>
+        </div>
+
+        <!-- Etkileşimli Test Alanı -->
+        <div class="bg-slate-900/40 border border-slate-800 rounded-3xl p-8 text-center backdrop-blur-md">
+            <h3 class="text-xl font-bold mb-3 text-white">Sistem Test Et</h3>
+            <p class="text-slate-400 text-sm mb-6">Aşağıdaki butona basarak elektrik simülasyonunu test edebilirsin.</p>
+            
+            <button onclick="triggerSparks(event)" class="electric-btn relative bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold px-8 py-4 rounded-2xl shadow-xl shadow-blue-500/20 cursor-pointer">
+                <i class="fa-solid fa-bolt mr-2"></i> Sistemi Ateşle
+            </button>
         </div>
     </main>
-    <footer class="border-t border-slate-900 py-4 text-center text-xs text-slate-600">Vercel Serverless Python</footer>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-500">
+        <p>VoidX Studios © 2026 — Python Flask & Vercel Serverless Architecture</p>
+    </footer>
+
+    <!-- Elektrik / Parıltı Animasyon Scripti -->
+    <script>
+        function triggerSparks(e) {
+            const btn = e.currentTarget;
+            for (let i = 0; i < 12; i++) {
+                const spark = document.createElement('div');
+                spark.classList.add('spark');
+                
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 80 + Math.random() * 60;
+                const startX = Math.cos(angle) * distance;
+                const startY = Math.sin(angle) * distance;
+                
+                spark.style.width = (4 + Math.random() * 4) + 'px';
+                spark.style.height = spark.style.width;
+                spark.style.setProperty('--startX', startX + 'px');
+                spark.style.setProperty('--startY', startY + 'px');
+                
+                btn.appendChild(spark);
+                
+                setTimeout(() => {
+                    spark.classList.add('spark-active');
+                }, 10);
+                
+                setTimeout(() => {
+                    spark.remove();
+                }, 400);
+            }
+        }
+    </script>
 </body>
 </html>
 """
@@ -38,7 +162,7 @@ def home():
 @app.route("/api/discord", methods=["GET", "POST"])
 def discord_proxy():
     if request.method == "GET":
-        return jsonify({"status": "active", "endpoint": "/api/discord"})
+        return jsonify({"status": "active", "brand": "VoidX Studios", "endpoint": "/api/discord"})
 
     try:
         data = request.json or {}
@@ -67,16 +191,9 @@ def discord_proxy():
                     "discord_response": guilds_res.text
                 }), 400
             
-            try:
-                guilds = guilds_res.json()
-            except Exception as e:
-                return jsonify({"error": "Sunucu listesi JSON formatına çevrilemedi.", "details": str(e)}), 500
-
+            guilds = guilds_res.json()
             if not isinstance(guilds, list):
-                return jsonify({"error": "Discord beklenmeyen bir veri döndü.", "response": guilds}), 500
-
-            if len(guilds) == 0:
-                return jsonify({"error": "Bu bot henüz hiçbir Discord sunucusuna eklenmemiş! Botu bir sunucuya davet edin."}), 400
+                return jsonify({"error": "Discord'dan geçersiz veri döndü."}), 500
 
             overview_result = []
             for g in guilds:
@@ -84,17 +201,22 @@ def discord_proxy():
                 g_name = g.get("name")
                 if not g_id:
                     continue
+                
                 ch_res = requests.get(f"https://discord.com/api/v10/guilds/{g_id}/channels", headers=headers)
                 if ch_res.status_code == 200:
                     try:
                         channels = ch_res.json()
                         if isinstance(channels, list):
                             text_channels = [{"id": c.get("id"), "name": c.get("name")} for c in channels if c.get("type") == 0 and c.get("id")]
-                            overview_result.append({"server_name": g_name, "channels": text_channels})
+                            if text_channels:
+                                overview_result.append({"server_name": g_name, "channels": text_channels})
                     except:
                         pass
                 else:
-                    overview_result.append({"server_name": g_name, "error": f"Kanallara erişilemedi (Status: {ch_res.status_code})" })
+                    continue
+
+            if not overview_result:
+                return jsonify({"error": "Erişilebilen hiçbir kanal bulunamadı. Lütfen botun sunucuda yetkisi olduğundan emin olun."}), 400
 
             return jsonify(overview_result)
 
@@ -104,44 +226,31 @@ def discord_proxy():
             if not target_channel_id:
                 guilds_res = requests.get("https://discord.com/api/v10/users/@me/guilds", headers=headers)
                 if guilds_res.status_code != 200:
-                    return jsonify({
-                        "error": "Sunucular alınamadı!",
-                        "discord_status": guilds_res.status_code,
-                        "discord_response": guilds_res.text
-                    }), 400
+                    return jsonify({"error": "Sunucular alınamadı.", "details": guilds_res.text}), 400
                 
                 guilds = guilds_res.json()
-                if not isinstance(guilds, list) or len(guilds) == 0:
-                    return jsonify({"error": "Bot hiçbir sunucuda bulunmuyor. Önce botu bir sunucuya ekleyin."}), 400
-                
-                first_guild_id = guilds[0].get("id")
-                channels_res = requests.get(f"https://discord.com/api/v10/guilds/{first_guild_id}/channels", headers=headers)
-                if channels_res.status_code != 200:
-                    return jsonify({
-                        "error": "Kanallar alınamadı!",
-                        "discord_status": channels_res.status_code,
-                        "discord_response": channels_res.text
-                    }), 400
-                
-                channels = channels_res.json()
-                if not isinstance(channels, list):
-                    return jsonify({"error": "Kanal listesi okunamadı.", "response": channels}), 400
+                if not isinstance(guilds, list) or not guilds:
+                    return jsonify({"error": "Sunucu bulunamadı."}), 400
 
-                for c in channels:
-                    if c.get("type") == 0:
-                        target_channel_id = c.get("id")
+                for g in guilds:
+                    g_id = g.get("id")
+                    ch_res = requests.get(f"https://discord.com/api/v10/guilds/{g_id}/channels", headers=headers)
+                    if ch_res.status_code == 200:
+                        channels = ch_res.json()
+                        if isinstance(channels, list):
+                            for c in channels:
+                                if c.get("type") == 0:
+                                    target_channel_id = c.get("id")
+                                    break
+                    if target_channel_id:
                         break
 
                 if not target_channel_id:
-                    return jsonify({"error": "İlk sunucuda uygun metin kanalı bulunamadı."}), 400
+                    return jsonify({"error": "Erişilebilir uygun metin kanalı bulunamadı."}), 400
 
             msg_res = requests.get(f"https://discord.com/api/v10/channels/{target_channel_id}/messages?limit=20", headers=headers)
             if msg_res.status_code != 200:
-                return jsonify({
-                    "error": "Mesajlar çekilemedi!",
-                    "discord_status": msg_res.status_code,
-                    "discord_response": msg_res.text
-                }), 400
+                return jsonify({"error": "Mesajlar çekilemedi.", "details": msg_res.text}), 400
             return jsonify(msg_res.json())
 
         # 3. Mesaj Gönder
@@ -154,4 +263,4 @@ def discord_proxy():
         return jsonify({"error": "Geçersiz action."}), 400
 
     except Exception as err:
-        return jsonify({"error": "Sunucu içi kritik hata", "details": str(err)}), 500
+        return jsonify({"error": "Sunucu içi hata", "details": str(err)}), 500
